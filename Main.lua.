@@ -1,111 +1,219 @@
 --[[ 
-    MASTER HUB v9.0 | LOAD-RESTING EDITION (FSOCIETY)
-    Features: Animated Boot Sequence, Loading Progress, UI Fade-In
+    MASTER HUB v8.5 | PRIVACY OVERLOAD (FSOCIETY)
+    New: Private Tab, Streamer Mode, Panic Key, Hit Sounds
+    Target: Arsenal, BedWars, Universal
 ]]
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
+local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local SoundService = game:GetService("SoundService")
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
--- 🎨 THEME
+-- 🛠️ SETTINGS & STATE
 local ACCENT = Color3.fromRGB(0, 255, 170)
+local PRIVATE_ACCENT = Color3.fromRGB(255, 50, 50)
 local BG_MAIN = Color3.fromRGB(5, 5, 8)
-local TWEEN_INFO = TweenInfo.new(0.5, Enum.EasingStyle.Quart)
+local TWEEN_INFO = TweenInfo.new(0.25, Enum.EasingStyle.Quart)
 
---------------------------------------------------
--- 🚀 THE LOADING SEQUENCE (LOAD-RESTING)
---------------------------------------------------
-local loadGui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
-loadGui.Name = "FS_Loading"
-
-local LoadMain = Instance.new("Frame", loadGui)
-LoadMain.Size = UDim2.new(0, 400, 0, 200); LoadMain.Position = UDim2.new(0.5, -200, 0.5, -100)
-LoadMain.BackgroundColor3 = BG_MAIN; LoadMain.BorderSizePixel = 0; Instance.new("UICorner", LoadMain)
-local LoadStroke = Instance.new("UIStroke", LoadMain); LoadStroke.Color = ACCENT; LoadStroke.Thickness = 2
-
-local Status = Instance.new("TextLabel", LoadMain)
-Status.Size = UDim2.new(1, 0, 0, 40); Status.Position = UDim2.new(0, 0, 0.2, 0)
-Status.BackgroundTransparency = 1; Status.Text = "INITIALIZING..."; Status.TextColor3 = ACCENT
-Status.Font = "Code"; Status.TextSize = 18
-
-local BarBack = Instance.new("Frame", LoadMain)
-BarBack.Size = UDim2.new(0.8, 0, 0, 10); BarBack.Position = UDim2.new(0.1, 0, 0.6, 0)
-BarBack.BackgroundColor3 = Color3.fromRGB(20, 20, 25); BarBack.BorderSizePixel = 0
-Instance.new("UICorner", BarBack)
-
-local Bar = Instance.new("Frame", BarBack)
-Bar.Size = UDim2.new(0, 0, 1, 0); Bar.BackgroundColor3 = ACCENT; Bar.BorderSizePixel = 0
-Instance.new("UICorner", Bar)
-
--- Boot Messages
-local messages = {
-    "Bypassing Anticheat...",
-    "Injecting Dark_Sector.exe...",
-    "Decrypting User_Data...",
-    "Connecting to Master_Server...",
-    "ACCESS GRANTED."
+local SETTINGS = {
+    Aimbot = false, SilentAim = false, Smoothness = 0.18, FOV = 140,
+    Esp = false, TeamCheck = true,
+    Speed = false, Jump = false, Noclip = false,
+    -- Private Features
+    StreamerMode = false, HitSounds = false, Panic = false,
+    Spammer = false, FOVOverlay = false
 }
 
--- Execution of Loading
-task.spawn(function()
-    for i, msg in ipairs(messages) do
-        Status.Text = "> " .. msg
-        local progress = i / #messages
-        TweenService:Create(Bar, TweenInfo.new(0.6), {Size = UDim2.new(progress, 0, 1, 0)}):Play()
-        task.wait(0.8)
+local Connections = {}
+
+--------------------------------------------------
+-- 🏗️ UI CONSTRUCTION (Side-Tab System)
+--------------------------------------------------
+local gui = Instance.new("ScreenGui", LocalPlayer.PlayerGui); gui.Name = "FS_HUB"; gui.ResetOnSpawn = false
+
+local Main = Instance.new("Frame", gui)
+Main.Size = UDim2.new(0, 500, 0, 380); Main.Position = UDim2.new(0.5, -250, 0.5, -190)
+Main.BackgroundColor3 = BG_MAIN; Main.BorderSizePixel = 0; Instance.new("UICorner", Main)
+local MainStroke = Instance.new("UIStroke", Main); MainStroke.Color = ACCENT; MainStroke.Thickness = 2
+
+-- Header
+local Header = Instance.new("Frame", Main)
+Header.Size = UDim2.new(1, 0, 0, 50); Header.BackgroundTransparency = 1
+local Title = Instance.new("TextButton", Header)
+Title.Size = UDim2.new(1, -60, 1, 0); Title.Position = UDim2.new(0, 15, 0, 0); Title.Text = "> FSOCIETY // ACCESS_GRANTED"
+Title.TextColor3 = ACCENT; Title.Font = "Code"; Title.TextXAlignment = "Left"; Title.BackgroundTransparency = 1; Title.TextSize = 18
+
+-- Navigation Sidebar
+local Sidebar = Instance.new("Frame", Main)
+Sidebar.Size = UDim2.new(0, 120, 1, -50); Sidebar.Position = UDim2.new(0, 0, 0, 50); Sidebar.BackgroundTransparency = 1
+local SideList = Instance.new("UIListLayout", Sidebar); SideList.Padding = UDim.new(0, 5)
+
+-- Pages Container
+local Pages = Instance.new("Frame", Main)
+Pages.Size = UDim2.new(1, -130, 1, -60); Pages.Position = UDim2.new(0, 125, 0, 55); Pages.BackgroundTransparency = 1
+
+local function CreatePage(name)
+    local p = Instance.new("ScrollingFrame", Pages)
+    p.Size = UDim2.new(1, 0, 1, 0); p.Visible = false; p.BackgroundTransparency = 1; p.ScrollBarThickness = 0; p.CanvasSize = UDim2.new(0,0,2,0)
+    Instance.new("UIListLayout", p).Padding = UDim.new(0, 5)
+    return p
+end
+
+local MainLog = CreatePage("Main"); MainLog.Visible = true
+local PrivatePage = CreatePage("Private")
+
+-- Tab Switching Logic
+local function AddTab(name, page, isPrivate)
+    local btn = Instance.new("TextButton", Sidebar)
+    btn.Size = UDim2.new(1, -10, 0, 35); btn.Text = name; btn.Font = "GothamBold"; btn.TextColor3 = Color3.fromRGB(150,150,150); btn.BackgroundTransparency = 1
+    if isPrivate then btn.Visible = false end
+
+    btn.MouseButton1Click:Connect(function()
+        for _, p in pairs(Pages:GetChildren()) do p.Visible = false end
+        page.Visible = true
+        for _, b in pairs(Sidebar:GetChildren()) do if b:IsA("TextButton") then b.TextColor3 = Color3.fromRGB(150,150,150) end end
+        btn.TextColor3 = isPrivate and PRIVATE_ACCENT or ACCENT
+    end)
+    return btn
+end
+
+local MainBtn = AddTab("GENERAL", MainLog, false)
+local PrivBtn = AddTab("DARK_SECTOR", PrivatePage, true)
+
+-- [UNLOCK PRIVACY] Tap Title 3 times
+local clicks = 0
+Title.MouseButton1Click:Connect(function()
+    clicks = clicks + 1
+    if clicks >= 3 then
+        PrivBtn.Visible = true
+        Title.Text = "> FSOCIETY // DARK_SECTOR_OPEN"
+        Title.TextColor3 = PRIVATE_ACCENT
+        MainStroke.Color = PRIVATE_ACCENT
     end
-    
-    -- Fade Out
-    TweenService:Create(LoadMain, TWEEN_INFO, {BackgroundTransparency = 1}):Play()
-    TweenService:Create(LoadStroke, TWEEN_INFO, {Transparency = 1}):Play()
-    TweenService:Create(Status, TWEEN_INFO, {TextTransparency = 1}):Play()
-    TweenService:Create(Bar, TWEEN_INFO, {BackgroundTransparency = 1}):Play()
-    TweenService:Create(BarBack, TWEEN_INFO, {BackgroundTransparency = 1}):Play()
-    
-    task.wait(0.5)
-    loadGui:Destroy()
-    
-    -- RUN MAIN SCRIPT HERE
-    StartMainScript()
 end)
 
 --------------------------------------------------
--- 🏗️ THE MAIN HUB (V8.5 Logic)
+-- 📂 FEATURE CREATOR
 --------------------------------------------------
-function StartMainScript()
-    local gui = Instance.new("ScreenGui", LocalPlayer.PlayerGui); gui.ResetOnSpawn = false
+local function NewToggle(parent, text, var)
+    local b = Instance.new("TextButton", parent)
+    b.Size = UDim2.new(0.95, 0, 0, 40); b.Text = " [ ] " .. text; b.Font = "Code"; b.TextColor3 = Color3.fromRGB(150,150,150); b.BackgroundColor3 = Color3.fromRGB(10,10,15); b.TextXAlignment = "Left"
+    Instance.new("UICorner", b)
     
-    local Main = Instance.new("Frame", gui)
-    Main.Size = UDim2.new(0, 500, 0, 380); Main.Position = UDim2.new(0.5, -250, 0.5, -190)
-    Main.BackgroundColor3 = BG_MAIN; Main.BorderSizePixel = 0; Main.Transparency = 1 -- Start invisible for fade-in
-    Instance.new("UICorner", Main)
-    local MainStroke = Instance.new("UIStroke", Main); MainStroke.Color = ACCENT; MainStroke.Thickness = 2; MainStroke.Transparency = 1
-
-    -- Fade In Animation
-    TweenService:Create(Main, TWEEN_INFO, {BackgroundTransparency = 0}):Play()
-    TweenService:Create(MainStroke, TWEEN_INFO, {Transparency = 0.4}):Play()
-
-    -- [Header & Title]
-    local Header = Instance.new("Frame", Main)
-    Header.Size = UDim2.new(1, 0, 0, 50); Header.BackgroundTransparency = 1
-    local Title = Instance.new("TextButton", Header)
-    Title.Size = UDim2.new(1, -60, 1, 0); Title.Position = UDim2.new(0, 15, 0, 0); Title.Text = "> FSOCIETY // ACCESS_GRANTED"
-    Title.TextColor3 = ACCENT; Title.Font = "Code"; Title.TextXAlignment = "Left"; Title.BackgroundTransparency = 1; Title.TextSize = 18
-
-    -- [Rest of the Sidebar and Page logic from previous version goes here]
-    -- (I've kept it shortened to show the new loading mechanics)
-    
-    local Close = Instance.new("TextButton", Main)
-    Close.Size = UDim2.new(0, 30, 0, 30); Close.Position = UDim2.new(1, -40, 0, 15); Close.Text = "X"; Close.TextColor3 = ACCENT; Close.BackgroundColor3 = Color3.fromRGB(20,20,25)
-    Instance.new("UICorner", Close); Close.MouseButton1Click:Connect(function() Main.Visible = false end)
-
-    local FSBtn = Instance.new("TextButton", gui)
-    FSBtn.Size = UDim2.new(0, 50, 0, 50); FSBtn.Position = UDim2.new(0, 20, 0.2, 0); FSBtn.Text = "FS"; FSBtn.TextColor3 = ACCENT; FSBtn.BackgroundColor3 = BG_MAIN
-    Instance.new("UICorner", FSBtn); local fsS = Instance.new("UIStroke", FSBtn); fsS.Color = ACCENT; fsS.Thickness = 2
-    FSBtn.MouseButton1Click:Connect(function() Main.Visible = not Main.Visible end)
-
-    print("Master Hub v9.0 Main Logic Loaded.")
+    b.MouseButton1Click:Connect(function()
+        SETTINGS[var] = not SETTINGS[var]
+        local active = SETTINGS[var]
+        b.Text = active and " [X] " .. text or " [ ] " .. text
+        b.TextColor3 = active and (parent == PrivatePage and PRIVATE_ACCENT or ACCENT) or Color3.fromRGB(150,150,150)
+    end)
 end
+
+-- Load General
+NewToggle(MainLog, "Combat: Aimbot", "Aimbot")
+NewToggle(MainLog, "Combat: Silent Aim", "SilentAim")
+NewToggle(MainLog, "Visual: Player ESP", "Esp")
+NewToggle(MainLog, "Move: God Speed", "Speed")
+
+-- Load Private (Dark Sector)
+NewToggle(PrivatePage, "UTIL: Streamer Mode", "StreamerMode")
+NewToggle(PrivatePage, "UTIL: Hit Sounds", "HitSounds")
+NewToggle(PrivatePage, "UTIL: FOV Overlay", "FOVOverlay")
+NewToggle(PrivatePage, "RISK: Chat Spammer", "Spammer")
+
+-- Panic Button
+local PanicBtn = Instance.new("TextButton", PrivatePage)
+PanicBtn.Size = UDim2.new(0.95, 0, 0, 40); PanicBtn.Text = " [!] EMERGENCY PANIC"; PanicBtn.BackgroundColor3 = Color3.fromRGB(50,0,0); PanicBtn.TextColor3 = Color3.new(1,1,1); PanicBtn.Font = "GothamBlack"
+Instance.new("UICorner", PanicBtn)
+PanicBtn.MouseButton1Click:Connect(function()
+    gui:Destroy()
+    for _, v in pairs(Connections) do v:Disconnect() end
+    print("FSOCIETY: Wipe Complete.")
+end)
+
+--------------------------------------------------
+-- ⚙️ CORE ENGINE (Enhanced)
+--------------------------------------------------
+local fov_circ = Drawing.new("Circle")
+fov_circ.Thickness = 1; fov_circ.NumSides = 100; fov_circ.Radius = SETTINGS.FOV; fov_circ.Visible = false; fov_circ.Color = ACCENT
+
+local function GetClosest()
+    local t, dist = nil, SETTINGS.FOV
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
+            local pos, vis = Camera:WorldToViewportPoint(p.Character.Head.Position)
+            if vis then
+                local mag = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                if mag < dist then dist = mag; t = p end
+            end
+        end
+    end
+    return t
+end
+
+Connections.Loop = RunService.RenderStepped:Connect(function()
+    -- FOV Circle
+    fov_circ.Visible = SETTINGS.FOVOverlay
+    fov_circ.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    
+    -- Streamer Mode
+    if SETTINGS.StreamerMode then
+        LocalPlayer.DisplayName = "Anonymous_Hacker"
+    end
+
+    -- Smooth Aim
+    if SETTINGS.Aimbot then
+        local t = GetClosest()
+        if t then Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, t.Character.Head.Position), SETTINGS.Smoothness) end
+    end
+    
+    -- Speed
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = SETTINGS.Speed and 75 or 16
+    end
+
+    -- ESP
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local h = p.Character:FindFirstChild("Highlight")
+            if SETTINGS.Esp then
+                if not h then h = Instance.new("Highlight", p.Character) end
+                h.Enabled = true; h.FillColor = ACCENT
+            elseif h then h.Enabled = false end
+        end
+    end
+end)
+
+-- Metamethods (Silent Aim & HitSounds)
+local old; old = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+
+    if method == "Raycast" and SETTINGS.SilentAim then
+        local t = GetClosest()
+        if t then args[2] = (t.Character.Head.Position - args[1]).Unit * 1000 end
+    end
+    
+    if method == "FireServer" and SETTINGS.HitSounds and self.Name == "HitPart" then
+        local s = Instance.new("Sound", SoundService)
+        s.SoundId = "rbxassetid://160432334"; s:Play() -- Classic Ding
+    end
+    
+    return old(self, unpack(args))
+end)
+
+-- Chat Spammer
+task.spawn(function()
+    while task.wait(10) do
+        if SETTINGS.Spammer then
+            local phrases = {"> SYSTEM_BREACHED", "[FS] Connection Terminated", "> No_One_Is_Safe"}
+            game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(phrases[math.random(1,#phrases)], "All")
+        end
+    end
+end)
+
+print("FSOCIETY v8.5: PRIVATE SECTOR ONLINE.")
