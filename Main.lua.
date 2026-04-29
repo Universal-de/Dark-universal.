@@ -1,0 +1,111 @@
+--[[ 
+    MASTER HUB v9.0 | LOAD-RESTING EDITION (FSOCIETY)
+    Features: Animated Boot Sequence, Loading Progress, UI Fade-In
+]]
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- 🎨 THEME
+local ACCENT = Color3.fromRGB(0, 255, 170)
+local BG_MAIN = Color3.fromRGB(5, 5, 8)
+local TWEEN_INFO = TweenInfo.new(0.5, Enum.EasingStyle.Quart)
+
+--------------------------------------------------
+-- 🚀 THE LOADING SEQUENCE (LOAD-RESTING)
+--------------------------------------------------
+local loadGui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+loadGui.Name = "FS_Loading"
+
+local LoadMain = Instance.new("Frame", loadGui)
+LoadMain.Size = UDim2.new(0, 400, 0, 200); LoadMain.Position = UDim2.new(0.5, -200, 0.5, -100)
+LoadMain.BackgroundColor3 = BG_MAIN; LoadMain.BorderSizePixel = 0; Instance.new("UICorner", LoadMain)
+local LoadStroke = Instance.new("UIStroke", LoadMain); LoadStroke.Color = ACCENT; LoadStroke.Thickness = 2
+
+local Status = Instance.new("TextLabel", LoadMain)
+Status.Size = UDim2.new(1, 0, 0, 40); Status.Position = UDim2.new(0, 0, 0.2, 0)
+Status.BackgroundTransparency = 1; Status.Text = "INITIALIZING..."; Status.TextColor3 = ACCENT
+Status.Font = "Code"; Status.TextSize = 18
+
+local BarBack = Instance.new("Frame", LoadMain)
+BarBack.Size = UDim2.new(0.8, 0, 0, 10); BarBack.Position = UDim2.new(0.1, 0, 0.6, 0)
+BarBack.BackgroundColor3 = Color3.fromRGB(20, 20, 25); BarBack.BorderSizePixel = 0
+Instance.new("UICorner", BarBack)
+
+local Bar = Instance.new("Frame", BarBack)
+Bar.Size = UDim2.new(0, 0, 1, 0); Bar.BackgroundColor3 = ACCENT; Bar.BorderSizePixel = 0
+Instance.new("UICorner", Bar)
+
+-- Boot Messages
+local messages = {
+    "Bypassing Anticheat...",
+    "Injecting Dark_Sector.exe...",
+    "Decrypting User_Data...",
+    "Connecting to Master_Server...",
+    "ACCESS GRANTED."
+}
+
+-- Execution of Loading
+task.spawn(function()
+    for i, msg in ipairs(messages) do
+        Status.Text = "> " .. msg
+        local progress = i / #messages
+        TweenService:Create(Bar, TweenInfo.new(0.6), {Size = UDim2.new(progress, 0, 1, 0)}):Play()
+        task.wait(0.8)
+    end
+    
+    -- Fade Out
+    TweenService:Create(LoadMain, TWEEN_INFO, {BackgroundTransparency = 1}):Play()
+    TweenService:Create(LoadStroke, TWEEN_INFO, {Transparency = 1}):Play()
+    TweenService:Create(Status, TWEEN_INFO, {TextTransparency = 1}):Play()
+    TweenService:Create(Bar, TWEEN_INFO, {BackgroundTransparency = 1}):Play()
+    TweenService:Create(BarBack, TWEEN_INFO, {BackgroundTransparency = 1}):Play()
+    
+    task.wait(0.5)
+    loadGui:Destroy()
+    
+    -- RUN MAIN SCRIPT HERE
+    StartMainScript()
+end)
+
+--------------------------------------------------
+-- 🏗️ THE MAIN HUB (V8.5 Logic)
+--------------------------------------------------
+function StartMainScript()
+    local gui = Instance.new("ScreenGui", LocalPlayer.PlayerGui); gui.ResetOnSpawn = false
+    
+    local Main = Instance.new("Frame", gui)
+    Main.Size = UDim2.new(0, 500, 0, 380); Main.Position = UDim2.new(0.5, -250, 0.5, -190)
+    Main.BackgroundColor3 = BG_MAIN; Main.BorderSizePixel = 0; Main.Transparency = 1 -- Start invisible for fade-in
+    Instance.new("UICorner", Main)
+    local MainStroke = Instance.new("UIStroke", Main); MainStroke.Color = ACCENT; MainStroke.Thickness = 2; MainStroke.Transparency = 1
+
+    -- Fade In Animation
+    TweenService:Create(Main, TWEEN_INFO, {BackgroundTransparency = 0}):Play()
+    TweenService:Create(MainStroke, TWEEN_INFO, {Transparency = 0.4}):Play()
+
+    -- [Header & Title]
+    local Header = Instance.new("Frame", Main)
+    Header.Size = UDim2.new(1, 0, 0, 50); Header.BackgroundTransparency = 1
+    local Title = Instance.new("TextButton", Header)
+    Title.Size = UDim2.new(1, -60, 1, 0); Title.Position = UDim2.new(0, 15, 0, 0); Title.Text = "> FSOCIETY // ACCESS_GRANTED"
+    Title.TextColor3 = ACCENT; Title.Font = "Code"; Title.TextXAlignment = "Left"; Title.BackgroundTransparency = 1; Title.TextSize = 18
+
+    -- [Rest of the Sidebar and Page logic from previous version goes here]
+    -- (I've kept it shortened to show the new loading mechanics)
+    
+    local Close = Instance.new("TextButton", Main)
+    Close.Size = UDim2.new(0, 30, 0, 30); Close.Position = UDim2.new(1, -40, 0, 15); Close.Text = "X"; Close.TextColor3 = ACCENT; Close.BackgroundColor3 = Color3.fromRGB(20,20,25)
+    Instance.new("UICorner", Close); Close.MouseButton1Click:Connect(function() Main.Visible = false end)
+
+    local FSBtn = Instance.new("TextButton", gui)
+    FSBtn.Size = UDim2.new(0, 50, 0, 50); FSBtn.Position = UDim2.new(0, 20, 0.2, 0); FSBtn.Text = "FS"; FSBtn.TextColor3 = ACCENT; FSBtn.BackgroundColor3 = BG_MAIN
+    Instance.new("UICorner", FSBtn); local fsS = Instance.new("UIStroke", FSBtn); fsS.Color = ACCENT; fsS.Thickness = 2
+    FSBtn.MouseButton1Click:Connect(function() Main.Visible = not Main.Visible end)
+
+    print("Master Hub v9.0 Main Logic Loaded.")
+end
